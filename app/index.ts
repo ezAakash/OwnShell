@@ -6,6 +6,7 @@ const rl = createInterface({
   prompt: "$ ",
 });
 
+const builtIns = ['echo', 'exit', 'type']
 
 rl.prompt();
 
@@ -14,10 +15,26 @@ rl.on('line', (command) => {//created a REPL here.
     rl.close()
     return 
   }
-  else if( command.startsWith('echo ')) {
-    const startIndex = command.indexOf('echo') + 4
-    console.log(command.substring(5))
-    rl.prompt()
+  else if( command.startsWith('type')) {
+    const words = command.split(' ')
+  
+    if ( words[0] !== "type" ) {
+      console.log(`${command} not found`)
+      rl.prompt()
+      return 
+    }
+
+    for (let i = 1; i < words.length; i++) {
+      if (builtIns.includes(words[i]!)){
+        console.log(`${words[i]} is a shell builtin`)
+      }
+      else if (words[i] === "") {
+        continue
+      }
+      else {
+        console.log(`${words[i]} not found`)
+      }
+    }
   }
   else{
     console.log(`${command}: command not found`)
