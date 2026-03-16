@@ -1,7 +1,8 @@
 import { createInterface } from "node:readline";
 import Path from "path";
-import { access, constants, readdir } from "fs/promises"
+import { access, constants} from "fs/promises"
 import type { PathLike } from "node:fs";
+import { spawn } from "child_process";
 
 const rl = createInterface({
   input: process.stdin,
@@ -13,7 +14,7 @@ const builtIns = ['echo', 'exit', 'type']
 const pathDir : string[] | undefined  = process.env.PATH?.split(Path.delimiter) || []
 
 
-async function searchForCommand(cmd: string): Promise<string | null> {
+async function searchForExecCommand(cmd: string): Promise<string | null> {
     for (const path of pathDir!) {
         const filePath: PathLike = Path.join(path ,cmd)
         try{
@@ -28,58 +29,47 @@ async function searchForCommand(cmd: string): Promise<string | null> {
     return null
 }
 
+let runCommand = (cmd: string, args: string[]) => {
+    spawn(cmd, args, { stdio: "inherit"})
+}
 
 rl.prompt();
 
-rl.on('line', async (command) => {//created a REPL here.
-  if ( command === 'exit') {
-    rl.close()
-    return 
-  }
-  else if( command.startsWith('type')) {
-    const words = command.split(' ')
-  
-    if ( words[0] !== "type" ) {
-      console.log(`${command} not found`)
-      rl.prompt()
-      return 
+rl.on('line', async (input) => {//created a REPL here.
+    const inputParts: string[] = input.split(/\s+/)
+    const cmd = inputParts[0]
+    const args = inputParts.slice(1)
+
+    if ( cmd === 'exit') {
+        rl.close()
+        return 
+    }
+    else if( cmd === "type") {  
+        for (let i = 0; i < args!.length; i++) {
+            if (builtIns.includes(args[i]!)){
+                console.log(`${args[i]} is a shell builtin`)
+                continue
+            }
+            
+            const filePath = await searchForExecCommand(args[i]!);
+            
+            if ( filePath ) console.log(`${args[i]} is ${filePath}`)
+            else console.log(`${args[i]} not found`)
+        }
+    }
+    else if( cmd === 'echo' ) {
+        const output = args.join(" ");
+        process.stdout.write(output + "\n");
+    }
+    else if (await searchForExecCommand(cmd!)) {
+        //console.log("command reached here")
+        runCommand(cmd!, args)
+        //console.log("command reached here111")
+        
+    }
+    else {
+        console.log(`${cmd}: command not found`)
     }
 
-    for (let i = 1; i < words.length; i++) {
-
-      if ( words[i] === "" ) {
-        continue
-      }
-
-      if (builtIns.includes(words[i]!)){
-        console.log(`${words[i]} is a shell builtin`)
-        continue
-      }
-      
-      const filePath = await searchForCommand(words[i]!);
-    
-      if (!!filePath) {
-        console.log(`${words[i]} is ${filePath}`)
-      }
-      else {
-        console.log(`${words[i]} not found`)
-      }
-    }
-  }
-  else if(command.startsWith('echo')) {
-    const words = command.split(/\s+/)
-
-    if ( words[0] !== 'echo') {
-      console.log(`${command}: command not found`)
-      return 
-    }
-
-    const output = words.slice(1).join(" ");
-    process.stdout.write(output + "\n");
-  }
-  else{
-    console.log(`${command}: command not found`)
-  }
-
-  rl.prompt()
+    rl.prompt()
 })
