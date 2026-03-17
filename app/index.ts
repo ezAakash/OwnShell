@@ -1,8 +1,10 @@
 import { createInterface } from "node:readline";
 import Path from "path";
 import { access, constants} from "fs/promises"
-import type { PathLike } from "node:fs";
-import { spawn } from "child_process";
+import { type PathLike } from "node:fs";
+import { execFileSync } from "child_process";
+import { chdir } from "process"
+
 
 const rl = createInterface({
   input: process.stdin,
@@ -10,7 +12,7 @@ const rl = createInterface({
   prompt: "$ ",
 });
 
-const builtIns = ['echo', 'exit', 'type']
+const builtIns = ['echo', 'exit', 'type', 'pwd', 'cd']
 const pathDir : string[] | undefined  = process.env.PATH?.split(Path.delimiter) || []
 
 
@@ -25,24 +27,38 @@ async function searchForExecCommand(cmd: string): Promise<string | null> {
             continue
         }
     }
-
     return null
 }
 
-let runCommand = (cmd: string, args: string[]) => {
-    spawn(cmd, args, { stdio: "inherit"})
-}
 
 rl.prompt();
 
 rl.on('line', async (input) => {//created a REPL here.
-    const inputParts: string[] = input.split(/\s+/)
+    const inputParts: string[] = input.trim().split(/\s+/)
     const cmd = inputParts[0]
     const args = inputParts.slice(1)
 
     if ( cmd === 'exit') {
         rl.close()
-        return 
+        return
+    }
+    else if ( cmd === "cd") {
+        const newdirPath = args.join(" ")
+        
+        try {
+            if ( newdirPath === '~' ) {
+                chdir(process.env.HOME!)
+            }else {
+                chdir(newdirPath)
+            }
+        }
+        catch (err) {
+            console.error(`cd: ${newdirPath}: No such file or directory`)
+        }
+    }
+    else if( cmd === 'pwd') {
+        const pwd = process.cwd()
+        console.log(pwd)
     }
     else if( cmd === "type") {  
         for (let i = 0; i < args!.length; i++) {
@@ -59,13 +75,10 @@ rl.on('line', async (input) => {//created a REPL here.
     }
     else if( cmd === 'echo' ) {
         const output = args.join(" ");
-        process.stdout.write(output + "\n");
+        console.log(output)
     }
     else if (await searchForExecCommand(cmd!)) {
-        //console.log("command reached here")
-        runCommand(cmd!, args)
-        //console.log("command reached here111")
-        
+        execFileSync(cmd!, args, { stdio: 'inherit'})
     }
     else {
         console.log(`${cmd}: command not found`)
